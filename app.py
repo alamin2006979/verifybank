@@ -1,7 +1,8 @@
 import os
-from flask import Flask
+from flask import Flask, redirect
 from extensions import db, login_manager
 from werkzeug.security import generate_password_hash
+from flask_login import UserMixin
 
 app = Flask(__name__)
 
@@ -16,6 +17,16 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
 db.init_app(app)
 login_manager.init_app(app)
 
+# Define User Model explicitly
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 # Blueprint setup
 try:
     from routes import main_bp
@@ -23,35 +34,29 @@ try:
 except Exception as e:
     print(f"Routes import info: {e}")
 
+# Root route redirect
+@app.route('/')
+def home():
+    return redirect('/login')
+
 # Auto Create Admin for Render Deployment
 with app.app_context():
     try:
         db.create_all()
-        from sqlalchemy import text
-        
-        # Check if user table exists & handle admin creation safely
+        admin = User.query.filter_by(username='Bankverify2026').first()
         hashed_pw = generate_password_hash('Alamin@202303010031', method='pbkdf2:sha256')
         
-        try:
-            res = db.session.execute(text("SELECT id FROM user WHERE username = 'Bankverify2026'")).fetchone()
-            if not res:
-                db.session.execute(text("INSERT INTO user (username, password_hash) VALUES ('Bankverify2026', :pw)"), {'pw': hashed_pw})
-                db.session.commit()
-                print("Default admin created successfully!")
-            else:
-                db.session.execute(text("UPDATE user SET password_hash = :pw WHERE username = 'Bankverify2026'"), {'pw': hashed_pw})
-                db.session.commit()
-                print("Admin password updated!")
-        except Exception as table_err:
-            print(f"Table operation info: {table_err}")
-            
+        if not admin:
+            admin = User(username='Bankverify2026', password_hash=hashed_pw)
+            db.session.add(admin)
+            db.session.commit()
+            print("Default admin created successfully!")
+        else:
+            admin.password_hash = hashed_pw
+            db.session.commit()
+            print("Admin password updated!")
     except Exception as e:
         print(f"Database init info: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-@app.route('/')
-def home():
-    from flask import redirect, url_for
-    return redirect(url_for('main.login'))
