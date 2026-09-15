@@ -50,3 +50,8 @@ with app.app_context():
 
 if __name__ == '__main__':
     app.run(debug=True)
+
+@app.route('/')
+def home():
+    from flask import redirect, url_for
+    return redirect(url_for('main.login'))
