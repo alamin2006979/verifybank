@@ -16,39 +16,35 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
 db.init_app(app)
 login_manager.init_app(app)
 
-# Fallback routes import or blueprint setup
+# Blueprint setup
 try:
     from routes import main_bp
     app.register_blueprint(main_bp)
-except ImportError:
-    pass
+except Exception as e:
+    print(f"Routes import info: {e}")
 
 # Auto Create Admin for Render Deployment
 with app.app_context():
     try:
         db.create_all()
-        # Dynamic User creation using reflection if models import fails
         from sqlalchemy import text
-        db.session.execute(text("""
-            CREATE TABLE IF NOT EXISTS user (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username VARCHAR(80) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL
-            );
-        """))
-        db.session.commit()
         
-        # Check and insert admin directly
-        res = db.session.execute(text("SELECT * FROM user WHERE username = 'Bankverify2026'")).fetchone()
+        # Check if user table exists & handle admin creation safely
         hashed_pw = generate_password_hash('Alamin@202303010031', method='pbkdf2:sha256')
-        if not res:
-            db.session.execute(text("INSERT INTO user (username, password_hash) VALUES ('Bankverify2026', :pw)"), {'pw': hashed_pw})
-            db.session.commit()
-            print("Default admin created successfully!")
-        else:
-            db.session.execute(text("UPDATE user SET password_hash = :pw WHERE username = 'Bankverify2026'"), {'pw': hashed_pw})
-            db.session.commit()
-            print("Admin password updated!")
+        
+        try:
+            res = db.session.execute(text("SELECT id FROM user WHERE username = 'Bankverify2026'")).fetchone()
+            if not res:
+                db.session.execute(text("INSERT INTO user (username, password_hash) VALUES ('Bankverify2026', :pw)"), {'pw': hashed_pw})
+                db.session.commit()
+                print("Default admin created successfully!")
+            else:
+                db.session.execute(text("UPDATE user SET password_hash = :pw WHERE username = 'Bankverify2026'"), {'pw': hashed_pw})
+                db.session.commit()
+                print("Admin password updated!")
+        except Exception as table_err:
+            print(f"Table operation info: {table_err}")
+            
     except Exception as e:
         print(f"Database init info: {e}")
 
