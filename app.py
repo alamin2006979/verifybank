@@ -1,12 +1,11 @@
 import os
-from flask import Flask, redirect
+from flask import Flask, redirect, render_template, request, flash, url_for
 from extensions import db, login_manager
-from werkzeug.security import generate_password_hash
-from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import UserMixin, login_user, logout_user, login_required
 
 app = Flask(__name__)
 
-# Basic Config
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-12345')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///verification.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -17,7 +16,6 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
 db.init_app(app)
 login_manager.init_app(app)
 
-# Define User Model explicitly
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -27,36 +25,33 @@ class User(UserMixin, db.Model):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# Blueprint setup
 try:
     from routes import main_bp
     app.register_blueprint(main_bp)
 except Exception as e:
-    print(f"Routes import info: {e}")
+    print(f"Routes blueprint info: {e}")
 
-# Root route redirect
 @app.route('/')
 def home():
     return redirect('/login')
 
-# Auto Create Admin for Render Deployment
 with app.app_context():
     try:
         db.create_all()
         admin = User.query.filter_by(username='Bankverify2026').first()
-        hashed_pw = generate_password_hash('Alamin@202303010031', method='pbkdf2:sha256')
+        hashed_pw = generate_password_hash('Alamin@202303010031')
         
         if not admin:
             admin = User(username='Bankverify2026', password_hash=hashed_pw)
             db.session.add(admin)
             db.session.commit()
-            print("Default admin created successfully!")
+            print("Admin user created successfully!")
         else:
             admin.password_hash = hashed_pw
             db.session.commit()
-            print("Admin password updated!")
+            print("Admin password reset successfully!")
     except Exception as e:
-        print(f"Database init info: {e}")
+        print(f"DB Init error: {e}")
 
 if __name__ == '__main__':
     app.run(debug=True)
