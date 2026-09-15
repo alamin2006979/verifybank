@@ -1,5 +1,6 @@
 import os
 from flask import Flask
+from werkzeug.security import generate_password_hash
 from extensions import db, login_manager
 
 app = Flask(__name__)
@@ -11,36 +12,35 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Adjust postgresql database url format for SQLAlchemy if needed
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
-app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 
 db.init_app(app)
 login_manager.init_app(app)
 
 from models import User
-from werkzeug.security import generate_password_hash
+from routes import main_bp
+
+app.register_blueprint(main_bp)
 
 # Auto Create Admin for Render Deployment
 with app.app_context():
-try:
-    db.create_all()
-    admin = User.query.filter_by(username='Bankverify2026').first()
-    if not admin:
-        admin = User(
-            username='Bankverify2026',
-            password_hash=generate_password_hash('Alamin@202303010031', method='pbkdf2:sha256')
-        )
-        db.session.add(admin)
-        db.session.commit()
-        print("Default admin 'Bankverify2026' created successfully!")
-    else:
-        admin.password_hash = generate_password_hash('Alamin@202303010031', method='pbkdf2:sha256')
-        db.session.commit()
-        print("Admin password updated successfully!")
-except Exception as e:
-    print(f"Error initializing admin: {e}")
-
-from routes import main_bp
-app.register_blueprint(main_bp)
+    try:
+        db.create_all()
+        admin = User.query.filter_by(username='Bankverify2026').first()
+        if not admin:
+            admin = User(
+                username='Bankverify2026',
+                password_hash=generate_password_hash('Alamin@202303010031', method='pbkdf2:sha256')
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print("Default admin 'Bankverify2026' created successfully!")
+        else:
+            admin.password_hash = generate_password_hash('Alamin@202303010031', method='pbkdf2:sha256')
+            db.session.commit()
+            print("Admin password updated successfully!")
+    except Exception as e:
+        print(f"Error initializing admin: {e}")
 
 if __name__ == '__main__':
-app.run(debug=True)
+    app.run(debug=True)
